@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Бавовна 3000</title>
+    <title>Бавовна 3000: Відплата</title>
     <style>
         :root {
             --bg-color: #0b0f19;
             --glass-bg: rgba(255, 255, 255, 0.05);
             --glass-border: rgba(255, 255, 255, 0.1);
+            --ua-blue: #0057b7;
+            --ua-yellow: #ffd700;
             --neon-red: #ff3b3b;
-            --neon-orange: #ff9800;
         }
 
         * {
@@ -22,50 +23,102 @@
         }
 
         body {
-            background: radial-gradient(circle at center, #1a233a 0%, var(--bg-color) 100%);
+            background: radial-gradient(circle at bottom, #1a233a 0%, var(--bg-color) 100%);
             color: #fff;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             overflow: hidden;
             height: 100vh;
             width: 100vw;
-            touch-action: none; /* Запобігає свайпам на мобільному */
-            perspective: 1000px; /* Для 3D ефектів */
+            touch-action: none;
+            perspective: 1000px;
         }
 
-        /* Глазморфізм UI */
+        /* Компактний Глазморфізм UI */
         .glass-panel {
             position: absolute;
-            top: 20px;
+            top: 15px;
             left: 50%;
             transform: translateX(-50%);
             background: var(--glass-bg);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
             border: 1px solid var(--glass-border);
-            border-radius: 20px;
-            padding: 15px 30px;
+            border-radius: 15px;
+            padding: 8px 20px;
             z-index: 100;
             text-align: center;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
             display: flex;
-            flex-direction: column;
-            gap: 5px;
-            min-width: 250px;
+            align-items: center;
+            gap: 15px;
         }
 
         .glass-panel h1 {
-            font-size: 1.2rem;
+            font-size: 0.9rem;
             font-weight: 600;
-            letter-spacing: 1px;
             text-transform: uppercase;
-            color: rgba(255,255,255,0.9);
+            color: rgba(255,255,255,0.7);
+            margin: 0;
         }
 
         .glass-panel p {
-            font-size: 1.5rem;
+            font-size: 1.2rem;
             font-weight: 700;
-            color: var(--neon-red);
-            text-shadow: 0 0 10px rgba(255, 59, 59, 0.5);
+            color: var(--ua-yellow);
+            margin: 0;
+            text-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+        }
+
+        /* Панель зброї знизу */
+        .weapons-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 100;
+        }
+
+        .btn-weapon {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 10px 15px;
+            color: #fff;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            outline: none;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-weapon:active {
+            transform: scale(0.95);
+        }
+
+        .btn-weapon.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .btn-weapon .cooldown {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            background: var(--ua-yellow);
+            width: 0%;
+            transition: width linear;
         }
 
         /* Ігровий простір */
@@ -76,235 +129,342 @@
             top: 0;
             left: 0;
             transform-style: preserve-3d;
-            transition: transform 0.3s ease-out;
         }
 
-        /* Цілі */
-        .target {
+        /* Батарея гравця */
+        #player-base {
             position: absolute;
-            font-size: 3.5rem;
-            filter: drop-shadow(0 10px 15px rgba(0,0,0,0.5));
-            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            bottom: -10px;
+            left: 50%;
+            width: 60px;
+            height: 40px;
+            background: linear-gradient(to top, #333, #555);
+            border-radius: 30px 30px 0 0;
+            transform: translateX(-50%);
+            box-shadow: 0 0 20px rgba(0, 87, 183, 0.5);
+            z-index: 10;
+        }
+
+        /* Ігрові сутності */
+        .entity {
+            position: absolute;
+            top: 0;
+            left: 0;
+            will-change: transform;
+            pointer-events: none;
             transform-style: preserve-3d;
-            will-change: left, top;
         }
 
-        /* Ракети */
+        .target {
+            font-size: 3rem;
+            filter: drop-shadow(0 5px 10px rgba(0,0,0,0.6));
+            z-index: 20;
+        }
+
+        /* Ракета */
         .missile {
-            position: absolute;
             width: 6px;
             height: 25px;
             background: #fff;
             border-radius: 10px;
-            box-shadow: 0 0 15px var(--neon-orange), 0 0 30px var(--neon-red);
-            transform-origin: bottom center;
-            will-change: left, top;
-            pointer-events: none;
-            z-index: 50;
+            box-shadow: 0 10px 10px var(--ua-yellow), 0 20px 15px var(--ua-blue);
+            z-index: 30;
         }
 
-        /* Вибух (3D анімація) */
+        /* Дрон */
+        .drone {
+            font-size: 1.8rem;
+            filter: drop-shadow(0 0 5px rgba(255,255,255,0.3));
+            z-index: 31;
+        }
+
+        /* Наводяща ракета */
+        .homing {
+            width: 10px;
+            height: 30px;
+            background: #ff5555;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px var(--neon-red), 0 15px 20px #ff9800;
+            z-index: 32;
+        }
+
+        /* Вибух */
         .explosion {
-            position: absolute;
-            font-size: 4rem;
-            pointer-events: none;
-            animation: explodeAnim 0.6s forwards cubic-bezier(0.1, 0.9, 0.2, 1);
-            text-shadow: 0 0 30px var(--neon-red);
-            z-index: 60;
+            font-size: 3.5rem;
+            z-index: 50;
+            animation: explodeAnim 0.5s forwards cubic-bezier(0.1, 0.9, 0.2, 1);
         }
 
         @keyframes explodeAnim {
-            0% { transform: scale(0.5) rotateX(0deg) rotateY(0deg); opacity: 1; }
-            50% { transform: scale(1.5) rotateX(180deg) rotateY(90deg); opacity: 0.8; }
-            100% { transform: scale(2) rotateX(360deg) rotateY(180deg); opacity: 0; filter: blur(5px); }
-        }
-
-        /* Декоративні зірки/пил на фоні для глибини */
-        .star {
-            position: absolute;
-            background: rgba(255,255,255,0.5);
-            border-radius: 50%;
-            pointer-events: none;
+            0% { transform: scale(0.5) rotate(0deg); opacity: 1; }
+            50% { transform: scale(1.5) rotate(45deg); opacity: 0.9; }
+            100% { transform: scale(2) rotate(90deg); opacity: 0; filter: blur(4px); }
         }
     </style>
 </head>
 <body>
 
     <div class="glass-panel">
-        <h1>Бавовна 3000</h1>
-        <p>Рахунок: <span id="score">0</span></p>
+        <h1>Рахунок</h1>
+        <p id="score">0</p>
     </div>
 
-    <div id="game-board"></div>
+    <div id="game-board">
+        <div id="player-base"></div>
+    </div>
+
+    <div class="weapons-panel">
+        <button class="btn-weapon" id="btn-drone">
+            <span>🛩️ Дрон</span>
+            <div class="cooldown" id="cd-drone"></div>
+        </button>
+        <button class="btn-weapon" id="btn-homing">
+            <span>🚀 Нептун</span>
+            <div class="cooldown" id="cd-homing"></div>
+        </button>
+    </div>
 
     <script>
         const board = document.getElementById('game-board');
         const scoreEl = document.getElementById('score');
-        let score = 0;
         
-        // Генерація фонового пилу для 3D ефекту
-        for(let i=0; i<50; i++) {
-            let star = document.createElement('div');
-            star.className = 'star';
-            star.style.width = Math.random() * 3 + 'px';
-            star.style.height = star.style.width;
-            star.style.left = Math.random() * 100 + 'vw';
-            star.style.top = Math.random() * 100 + 'vh';
-            star.style.transform = `translateZ(-${Math.random() * 500}px)`;
-            board.appendChild(star);
-        }
-
-        // Ігрові масиви
+        let score = 0;
         let targets = [];
-        let missiles = [];
+        let projectiles = [];
+        
+        // Управління
+        let isShooting = false;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let currentAngle = -Math.PI / 2; // За замовчуванням прямо вгору
+        let lastShootTime = 0;
+        const shootRate = 150; // Інтервал пострілів в мс
 
-        const targetEmojis = ['🚢', '🏛️']; // Російський корабель та будівля (москов сіті/кремль)
+        // Цільові об'єкти
+        const targetEmojis = ['🏛️', '🚢🇷🇺']; 
 
-        // Спавн цілей
+        // Центр гравця
+        const base = {
+            get x() { return window.innerWidth / 2; },
+            get y() { return window.innerHeight - 20; }
+        };
+
+        // --- СПАВН ЦІЛЕЙ ---
         function spawnTarget() {
             const el = document.createElement('div');
-            el.className = 'target';
+            el.className = 'entity target';
             el.innerText = targetEmojis[Math.floor(Math.random() * targetEmojis.length)];
-            
-            // Випадкова висота у верхній половині екрану
-            const startY = Math.random() * (window.innerHeight * 0.4) + 50; 
-            const direction = Math.random() > 0.5 ? 1 : -1; // 1 = зліва направо, -1 = справа наліво
-            const startX = direction === 1 ? -100 : window.innerWidth + 100;
-            
-            el.style.top = `${startY}px`;
-            el.style.left = `${startX}px`;
-            
             board.appendChild(el);
             
+            const startY = Math.random() * (window.innerHeight * 0.4) + 60; 
+            const direction = Math.random() > 0.5 ? 1 : -1;
+            const startX = direction === 1 ? -100 : window.innerWidth + 100;
+            
             targets.push({
-                element: el,
+                el: el,
                 x: startX,
                 y: startY,
-                speed: (Math.random() * 2 + 1.5) * direction,
-                width: 50,
-                height: 50
+                speed: (Math.random() * 0.8 + 0.5) * direction, // Повільніші цілі
+                radius: 30
+            });
+        }
+        setInterval(spawnTarget, 1500);
+
+        // --- УПРАВЛІННЯ (Дзеркальне прицілювання) ---
+        window.addEventListener('pointerdown', (e) => {
+            if (e.target.closest('.weapons-panel') || e.target.closest('.glass-panel')) return;
+            isShooting = true;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            currentAngle = -Math.PI / 2; // Зкидаємо на прямий постріл
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            if (!isShooting) return;
+            const dx = e.clientX - dragStartX;
+            const dy = e.clientY - dragStartY;
+            
+            // Якщо палець ковзає, змінюємо кут дзеркально (-dx, -dy)
+            if (Math.hypot(dx, dy) > 10) {
+                currentAngle = Math.atan2(-dy, -dx);
+            }
+            
+            // Легкий 3D ефект ігрового поля від напрямку пострілу
+            const rotateY = (e.clientX / window.innerWidth - 0.5) * 10;
+            const rotateX = (e.clientY / window.innerHeight - 0.5) * -10;
+            board.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+        });
+
+        const stopShooting = () => { 
+            isShooting = false; 
+            board.style.transform = 'rotateX(0deg) rotateY(0deg)';
+        };
+        window.addEventListener('pointerup', stopShooting);
+        window.addEventListener('pointercancel', stopShooting);
+
+        // --- ЗБРОЯ ---
+        function launchProjectile(type) {
+            const el = document.createElement('div');
+            el.className = `entity ${type === 'normal' ? 'missile' : type}`;
+            if (type === 'drone') el.innerText = '🛩️';
+            board.appendChild(el);
+
+            let proj = {
+                el: el,
+                type: type,
+                x: base.x,
+                y: base.y,
+                angle: type === 'normal' ? currentAngle : -Math.PI / 2,
+                speed: type === 'drone' ? 3 : (type === 'homing' ? 12 : 15),
+                active: true,
+                targetRef: null
+            };
+
+            // Для наводящої ракети одразу фіксуємо рандомну ціль
+            if (type === 'homing' && targets.length > 0) {
+                proj.targetRef = targets[Math.floor(Math.random() * targets.length)];
+            }
+
+            projectiles.push(proj);
+        }
+
+        // Кнопки спец-зброї з кулдауном
+        function setupButton(btnId, type, cooldownMs) {
+            const btn = document.getElementById(btnId);
+            const cdIndicator = document.getElementById(`cd-${type === 'drone' ? 'drone' : 'homing'}`);
+            let isReady = true;
+
+            btn.addEventListener('pointerdown', (e) => {
+                e.stopPropagation();
+                if (!isReady) return;
+                
+                launchProjectile(type);
+                isReady = false;
+                btn.classList.add('disabled');
+                
+                cdIndicator.style.transition = 'none';
+                cdIndicator.style.width = '100%';
+                
+                setTimeout(() => {
+                    cdIndicator.style.transition = `width ${cooldownMs}ms linear`;
+                    cdIndicator.style.width = '0%';
+                }, 50);
+
+                setTimeout(() => {
+                    isReady = true;
+                    btn.classList.remove('disabled');
+                }, cooldownMs);
             });
         }
 
-        setInterval(spawnTarget, 1200);
+        setupButton('btn-drone', 'drone', 5000);
+        setupButton('btn-homing', 'homing', 3000);
 
-        // Запуск ракети по тапу/кліку
-        window.addEventListener('pointerdown', (e) => {
-            const startX = window.innerWidth / 2;
-            const startY = window.innerHeight;
-            const targetX = e.clientX;
-            const targetY = e.clientY;
+        // --- ІГРОВИЙ ЦИКЛ ---
+        function gameLoop(timestamp) {
+            // Безперервний постріл звичайними ракетами
+            if (isShooting && timestamp - lastShootTime > shootRate) {
+                launchProjectile('normal');
+                lastShootTime = timestamp;
+            }
 
-            // 3D нахил ігрового поля від дотику
-            const rotateX = ((targetY / window.innerHeight) - 0.5) * -20;
-            const rotateY = ((targetX / window.innerWidth) - 0.5) * 20;
-            board.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
-            
-            // Повернення дошки у вихідне положення
-            setTimeout(() => {
-                board.style.transform = 'rotateX(0deg) rotateY(0deg)';
-            }, 300);
-
-            // Створення ракети
-            const missileEl = document.createElement('div');
-            missileEl.className = 'missile';
-            missileEl.style.left = `${startX}px`;
-            missileEl.style.top = `${startY}px`;
-            
-            // Обчислення кута повороту ракети
-            const angle = Math.atan2(targetY - startY, targetX - startX) * 180 / Math.PI;
-            missileEl.style.transform = `rotate(${angle + 90}deg)`; // +90 бо ракета дивиться вгору
-            
-            board.appendChild(missileEl);
-
-            // Швидкість ракети
-            const distance = Math.hypot(targetX - startX, targetY - startY);
-            const duration = distance / 15; // Швидкість польоту
-            
-            const dx = (targetX - startX) / duration;
-            const dy = (targetY - startY) / duration;
-
-            missiles.push({
-                element: missileEl,
-                x: startX,
-                y: startY,
-                dx: dx,
-                dy: dy,
-                life: duration,
-                active: true
-            });
-        });
-
-        // Ігровий цикл (рух та колізії)
-        function gameLoop() {
-            // Рух цілей
+            // Оновлення цілей
             for (let i = targets.length - 1; i >= 0; i--) {
                 let t = targets[i];
                 t.x += t.speed;
-                t.element.style.left = `${t.x}px`;
+                
+                // Анімація коливання
+                const yOffset = Math.sin(timestamp * 0.003 + t.x) * 10;
+                t.el.style.transform = `translate(${t.x}px, ${t.y + yOffset}px)`;
 
-                // Легка 3D ротація під час руху
-                t.element.style.transform = `rotateY(${t.x * 0.2}deg) rotateZ(${Math.sin(t.x * 0.05) * 5}deg)`;
-
-                // Видалення, якщо вийшли за екран
                 if (t.x > window.innerWidth + 150 || t.x < -150) {
-                    t.element.remove();
+                    t.el.remove();
                     targets.splice(i, 1);
                 }
             }
 
-            // Рух ракет та перевірка влучань
-            for (let i = missiles.length - 1; i >= 0; i--) {
-                let m = missiles[i];
-                if (!m.active) continue;
+            // Оновлення снарядів
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                let p = projectiles[i];
+                if (!p.active) continue;
 
-                m.x += m.dx;
-                m.y += m.dy;
-                m.life--;
+                // Логіка польоту залежно від типу
+                if (p.type === 'drone') {
+                    // Повільно шукає найближчу ціль
+                    let nearest = null;
+                    let minDist = Infinity;
+                    targets.forEach(t => {
+                        const dist = Math.hypot(t.x - p.x, t.y - p.y);
+                        if (dist < minDist) { minDist = dist; nearest = t; }
+                    });
 
-                m.element.style.left = `${m.x}px`;
-                m.element.style.top = `${m.y}px`;
+                    if (nearest) {
+                        const targetAngle = Math.atan2(nearest.y - p.y, nearest.x - p.x);
+                        // Плавний поворот дзеркально (Lerp)
+                        p.angle += (targetAngle - p.angle) * 0.05;
+                    }
+                } else if (p.type === 'homing') {
+                    // Швидко летить до зафіксованої цілі
+                    if (p.targetRef && targets.includes(p.targetRef)) {
+                        p.angle = Math.atan2(p.targetRef.y - p.y, p.targetRef.x - p.x);
+                    } else {
+                        // Якщо ціль знищена іншим снарядом, летить прямо
+                        p.targetRef = null;
+                    }
+                }
 
-                // Перевірка колізії (AABB)
+                // Рух
+                p.x += Math.cos(p.angle) * p.speed;
+                p.y += Math.sin(p.angle) * p.speed;
+
+                // Ротація DOM елемента (+90 градусів бо макети дивляться вгору)
+                p.el.style.transform = `translate(${p.x}px, ${p.y}px) rotate(${p.angle + Math.PI/2}rad)`;
+
+                // Видалення за межами екрану
+                if (p.x < -50 || p.x > window.innerWidth + 50 || p.y < -50 || p.y > window.innerHeight + 50) {
+                    p.el.remove();
+                    projectiles.splice(i, 1);
+                    continue;
+                }
+
+                // Перевірка колізій
                 let hit = false;
                 for (let j = targets.length - 1; j >= 0; j--) {
                     let t = targets[j];
-                    // Спрощена перевірка радіусу (близько 40px)
-                    const dist = Math.hypot(m.x - (t.x + 25), m.y - (t.y + 25));
+                    // Перевірка дистанції (радіус ураження)
+                    const dist = Math.hypot(p.x - t.x, p.y - t.y);
                     
-                    if (dist < 45) { // Влучання!
-                        // Створення вибуху
+                    if (dist < t.radius + 15) {
+                        // Вибух
                         const explosion = document.createElement('div');
-                        explosion.className = 'explosion';
+                        explosion.className = 'entity explosion';
                         explosion.innerText = '💥';
-                        explosion.style.left = `${t.x}px`;
-                        explosion.style.top = `${t.y}px`;
+                        // Центруємо вибух
+                        explosion.style.transform = `translate(${t.x - 20}px, ${t.y - 20}px)`;
                         board.appendChild(explosion);
                         
-                        setTimeout(() => explosion.remove(), 600);
+                        setTimeout(() => explosion.remove(), 500);
 
-                        // Оновлення рахунку
-                        score += 100;
+                        score += (p.type === 'normal' ? 100 : (p.type === 'homing' ? 50 : 150));
                         scoreEl.innerText = score;
 
-                        // Очищення DOM та масивів
-                        t.element.remove();
+                        t.el.remove();
                         targets.splice(j, 1);
                         hit = true;
                         break;
                     }
                 }
 
-                if (hit || m.life <= 0) {
-                    m.element.remove();
-                    missiles.splice(i, 1);
+                if (hit) {
+                    p.el.remove();
+                    projectiles.splice(i, 1);
                 }
             }
 
             requestAnimationFrame(gameLoop);
         }
 
-        // Запуск гри
+        // Старт гри
         requestAnimationFrame(gameLoop);
     </script>
 </body>
