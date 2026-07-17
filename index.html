@@ -3,93 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Операція: Відплата</title>
+    <title>Свинська Навала</title>
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; }
-        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 1000; display: flex; align-items: center; justify-content: center; }
-        button { padding: 20px 40px; font-size: 24px; cursor: pointer; background: #0057b7; color: #fff; border: none; border-radius: 10px; }
+        body { margin: 0; padding: 0; background: #0b0f19; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
-        #ui { position: fixed; top: 10px; left: 10px; z-index: 10; pointer-events: none; font-size: 20px; }
+        #ui { position: absolute; top: 20px; left: 20px; z-index: 10; pointer-events: none; }
+        .score { font-size: 24px; font-weight: bold; color: #ffd700; text-shadow: 0 0 10px rgba(0,0,0,0.5); }
     </style>
 </head>
 <body>
-    <div id="overlay"><button id="start-btn">ДО БОЮ!</button></div>
-    <div id="ui">Рахунок: <span id="score">0</span> | <span id="mode-text">HIMARS</span></div>
+    <div id="ui">
+        <div class="score">Рахунок: <span id="val">0</span></div>
+    </div>
     <canvas id="game"></canvas>
 
-    <script>
-        const canvas = document.getElementById('game');
-        const ctx = canvas.getContext('2d');
-        const scoreEl = document.getElementById('score');
-        const modeText = document.getElementById('mode-text');
-        
-        let score = 0, mode = 'himars', running = false;
-        let objects = [];
+<script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const scoreVal = document.getElementById('val');
+    let score = 0, speedMult = 1;
+    let pigs = [], particles = [];
 
-        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-        window.onresize = resize; resize();
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    window.onresize = resize; resize();
 
-        document.getElementById('start-btn').onclick = () => {
-            document.getElementById('overlay').style.display = 'none';
-            running = true;
-            loop();
-        };
-
-        window.ontouchstart = (e) => {
-            const x = e.touches[0].clientX;
-            const y = e.touches[0].clientY;
-            
-            if (y < 100 && x < 200) { mode = mode === 'himars' ? 'ppo' : 'himars'; modeText.innerText = mode.toUpperCase(); return; }
-
-            if (mode === 'himars') {
-                objects.push({ type: 'rocket', x: x, y: 0, targetY: y, active: true });
-            } else {
-                objects.push({ type: 'bullet', x: canvas.width/2, y: canvas.height, tx: x, ty: y, active: true });
-            }
-        };
-
-        function loop() {
-            if (!running) return;
-            ctx.fillStyle = 'rgba(0,0,0,0.2)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Спавн ворогів
-            if (Math.random() < 0.03) {
-                objects.push({ type: 'enemy', x: Math.random() * canvas.width, y: -20, active: true });
-            }
-
-            objects.forEach((obj, i) => {
-                if (obj.type === 'rocket') {
-                    ctx.fillStyle = 'yellow';
-                    ctx.fillRect(obj.x, obj.y += 10, 4, 20);
-                    if (obj.y >= obj.targetY) {
-                        ctx.beginPath(); ctx.arc(obj.x, obj.y, 40, 0, Math.PI*2); ctx.fillStyle = 'red'; ctx.fill();
-                        obj.active = false; score += 10;
-                    }
-                } else if (obj.type === 'bullet') {
-                    ctx.fillStyle = 'lime';
-                    obj.x += (obj.tx - canvas.width/2) / 10;
-                    obj.y += (obj.ty - canvas.height) / 10;
-                    ctx.fillRect(obj.x, obj.y, 4, 10);
-                    if (obj.y < 0) obj.active = false;
-                } else if (obj.type === 'enemy') {
-                    ctx.fillStyle = obj.hit ? 'white' : 'red';
-                    ctx.fillRect(obj.x, obj.y += 2, 30, 30);
-                    
-                    // Перевірка влучань
-                    objects.forEach(p => {
-                        if ((p.type === 'bullet') && Math.hypot(p.x - obj.x, p.y - obj.y) < 40) {
-                            obj.active = false; p.active = false; score += 50;
-                        }
-                    });
-                }
-                if (obj.y > canvas.height) obj.active = false;
-            });
-
-            objects = objects.filter(o => o.active);
-            scoreEl.innerText = score;
-            requestAnimationFrame(loop);
+    class Pig {
+        constructor() {
+            this.x = Math.random() * (canvas.width - 50) + 25;
+            this.y = -50;
+            this.size = 40 + Math.random() * 20;
+            this.speed = (1 + Math.random() * 2) * speedMult;
         }
-    </script>
+        update() { this.y += this.speed; }
+        draw() {
+            ctx.font = `${this.size}px Arial`;
+            ctx.fillText('🐷', this.x, this.y);
+        }
+    }
+
+    class Particle {
+        constructor(x, y) {
+            this.x = x; this.y = y;
+            this.vx = (Math.random() - 0.5) * 10;
+            this.vy = (Math.random() - 0.5) * 10;
+            this.life = 1.0;
+        }
+        update() { this.x += this.vx; this.y += this.vy; this.life -= 0.02; }
+        draw() {
+            ctx.fillStyle = `rgba(255, 100, 100, ${this.life})`;
+            ctx.fillRect(this.x, this.y, 6, 6);
+        }
+    }
+
+    function spawnPig() { if(Math.random() < 0.05) pigs.push(new Pig()); }
+
+    window.addEventListener('pointerdown', (e) => {
+        pigs.forEach((p, i) => {
+            if (Math.hypot(e.clientX - (p.x + p.size/2), e.clientY - (p.y + p.size/2)) < p.size) {
+                for(let j=0; j<10; j++) particles.push(new Particle(p.x, p.y));
+                pigs.splice(i, 1);
+                score++;
+                scoreVal.innerText = score;
+                speedMult += 0.05; // Збільшуємо складність
+            }
+        });
+    });
+
+    function loop() {
+        ctx.fillStyle = 'rgba(11, 15, 25, 0.3)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        spawnPig();
+        
+        pigs.forEach((p, i) => {
+            p.update(); p.draw();
+            if (p.y > canvas.height) pigs.splice(i, 1);
+        });
+
+        particles.forEach((p, i) => {
+            p.update(); p.draw();
+            if (p.life <= 0) particles.splice(i, 1);
+        });
+
+        requestAnimationFrame(loop);
+    }
+    loop();
+</script>
 </body>
 </html>
