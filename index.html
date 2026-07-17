@@ -3,462 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Операція "Відплата"</title>
+    <title>Операція: Відплата</title>
     <style>
-        :root {
-            --glass-bg: rgba(20, 20, 25, 0.6);
-            --glass-border: rgba(255, 255, 255, 0.1);
-            --ua-blue: #0057b7;
-            --ua-yellow: #ffd700;
-            --neon-green: #00ff66;
-            --neon-red: #ff3333;
-            --z-color: #ffcccc;
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-user-select: none; }
-
-        body {
-            background: #050508; color: #fff;
-            font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
-            overflow: hidden; height: 100vh; width: 100vw; touch-action: none;
-        }
-
-        /* Трясіння екрану при вибухах */
-        .shake { animation: screenShake 0.3s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
-        @keyframes screenShake {
-            0%, 100% { transform: translate3d(0, 0, 0); }
-            20% { transform: translate3d(-4px, 4px, 0); }
-            40% { transform: translate3d(4px, -4px, 0); }
-            60% { transform: translate3d(-2px, 2px, 0); }
-            80% { transform: translate3d(2px, -2px, 0); }
-        }
-
-        /* --- СЮЖЕТНИЙ ВСТУП --- */
-        #story-board {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
-            z-index: 2000; display: flex; flex-direction: column;
-            justify-content: center; align-items: center; padding: 20px;
-        }
-        .briefing {
-            background: var(--glass-bg); border: 1px solid var(--ua-blue);
-            padding: 30px; border-radius: 15px; max-width: 500px;
-            box-shadow: 0 0 30px rgba(0, 87, 183, 0.4);
-        }
-        .briefing h1 { color: var(--ua-yellow); margin-bottom: 15px; font-size: 1.5rem; text-transform: uppercase;}
-        .briefing p { font-size: 1rem; line-height: 1.5; margin-bottom: 10px; color: #ccc; }
-        .btn-start {
-            margin-top: 20px; padding: 15px 30px; width: 100%;
-            background: linear-gradient(90deg, var(--ua-blue), #003377);
-            color: white; border: none; border-radius: 8px;
-            font-size: 1.2rem; font-weight: bold; cursor: pointer;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5); text-transform: uppercase;
-        }
-        .btn-start:active { transform: scale(0.95); }
-
-        /* --- UI ПАНЕЛЬ --- */
-        .ui-panel {
-            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
-            display: none; flex-direction: column; gap: 10px; z-index: 1000; width: 90%; max-width: 400px;
-        }
-        .tabs { display: flex; background: var(--glass-bg); border-radius: 20px; padding: 5px; border: 1px solid var(--glass-border); backdrop-filter: blur(10px); }
-        .tab-btn {
-            flex: 1; padding: 8px; text-align: center; border-radius: 15px; font-weight: 700; font-size: 0.85rem;
-            color: rgba(255,255,255,0.5); transition: 0.3s;
-        }
-        .tab-btn.active { background: rgba(255,255,255,0.1); color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
-        .stats { display: flex; justify-content: space-between; padding: 0 10px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
-        .val-gold { color: var(--ua-yellow); }
-
-        /* --- ІГРОВІ ПОЛЯ --- */
-        .game-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; overflow: hidden; }
-        .game-screen.active { display: block; }
-        
-        #screen-offense { background: linear-gradient(to bottom, #1a0b0b 0%, #3a1515 100%); border-bottom: 20px solid #111; }
-        #screen-defense { background: radial-gradient(circle at top, #0a1020 0%, #020305 100%); }
-
-        /* Місто для ППО */
-        .city { position: absolute; bottom: 0; width: 100%; height: 80px; display: flex; justify-content: space-around; align-items: flex-end; z-index: 10; border-top: 1px solid #222; background: #050505; }
-        .house { font-size: 2.5rem; transition: 0.3s; filter: drop-shadow(0 -2px 5px #000); }
-        .house.ruin { filter: grayscale(1) brightness(0.3); transform: scaleY(0.6); transform-origin: bottom; }
-
-        /* Зенітка (Турель) */
-        #turret-base {
-            position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
-            width: 50px; height: 30px; background: #334; border-radius: 20px 20px 0 0; z-index: 20;
-            box-shadow: 0 0 20px rgba(0, 255, 102, 0.2);
-        }
-        #turret-gun {
-            position: absolute; bottom: 15px; left: 50%; width: 8px; height: 40px;
-            background: linear-gradient(to top, #667, #889); transform-origin: bottom center;
-            transform: translateX(-50%) rotate(0deg); border-radius: 4px;
-        }
-
-        /* --- ІГРОВІ СУТНОСТІ --- */
-        .entity { position: absolute; will-change: transform; pointer-events: none; }
-        
-        /* Вороги Наступу */
-        .orc { font-size: 2rem; filter: drop-shadow(0 4px 4px rgba(0,0,0,0.5)); }
-        .orc::after { content: 'Z'; position: absolute; top: -5px; right: -5px; color: var(--neon-red); font-size: 0.8rem; font-weight: bold; background: rgba(255,255,255,0.8); padding: 0 3px; border-radius: 3px; }
-        
-        /* Приціл HIMARS */
-        #crosshair {
-            position: absolute; width: 40px; height: 40px; border: 2px dashed var(--neon-red);
-            border-radius: 50%; transform: translate(-50%, -50%); display: none; z-index: 50;
-            animation: spin 4s linear infinite; pointer-events: none;
-        }
-        @keyframes spin { 100% { transform: translate(-50%, -50%) rotate(360deg); } }
-
-        /* Снаряди */
-        .himars-rocket { width: 4px; height: 30px; background: #fff; box-shadow: 0 -10px 15px var(--neon-orange); border-radius: 2px; }
-        .tracer { width: 3px; height: 25px; background: #fff; box-shadow: 0 0 8px var(--neon-green), 0 0 15px var(--neon-green); border-radius: 2px; }
-
-        /* Вороги ППО */
-        .shahed { font-size: 2rem; }
-        .kalibr { font-size: 1.8rem; }
-
-        /* Фізичні частинки вибуху */
-        .particle {
-            position: absolute; width: 6px; height: 6px; border-radius: 50%;
-            pointer-events: none; will-change: transform;
-        }
+        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; }
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 1000; display: flex; align-items: center; justify-content: center; }
+        button { padding: 20px 40px; font-size: 24px; cursor: pointer; background: #0057b7; color: #fff; border: none; border-radius: 10px; }
+        canvas { display: block; }
+        #ui { position: fixed; top: 10px; left: 10px; z-index: 10; pointer-events: none; font-size: 20px; }
     </style>
 </head>
 <body>
-
-    <!-- СЮЖЕТ -->
-    <div id="story-board">
-        <div class="briefing">
-            <h1>Оперативне Зведення</h1>
-            <p><strong>Рік 2026.</strong> Ворог не полишає спроб зламати наш опір.</p>
-            <p><strong>🎯 Режим "Наступ":</strong> Використовуй HIMARS. Води пальцем по ворожих позиціях, щоб наводити ракети з неба. Знищуй Z-танки та орків.</p>
-            <p><strong>🛡️ Режим "ППО":</strong> Керуй зенітною установкою. Води пальцем по небу, щоб турель автоматично вела вогонь по "Шахедах" та ракетах. Захисти місто!</p>
-            <button class="btn-start" onclick="startGame()">До бою!</button>
-        </div>
-    </div>
-
-    <!-- UI -->
-    <div class="ui-panel" id="main-ui">
-        <div class="tabs">
-            <div class="tab-btn active" onclick="setMode('offense')">🎯 Наступ (HIMARS)</div>
-            <div class="tab-btn" onclick="setMode('defense')">🛡️ ППО (Захист)</div>
-        </div>
-        <div class="stats">
-            <div>Рахунок: <span id="score" class="val-gold">0</span></div>
-            <div id="hp-stat">Стан міста: <span id="city-hp" style="color:var(--neon-green)">100%</span></div>
-        </div>
-    </div>
-
-    <!-- РЕЖИМ 1: НАСТУП -->
-    <div id="screen-offense" class="game-screen">
-        <div id="crosshair"></div>
-    </div>
-
-    <!-- РЕЖИМ 2: ППО -->
-    <div id="screen-defense" class="game-screen">
-        <div class="city" id="city">
-            <div class="house" id="h0">🏠</div><div class="house" id="h1">🏥</div>
-            <div class="house" id="h2">🏢</div><div class="house" id="h3">🏫</div>
-            <div class="house" id="h4">🏛️</div>
-        </div>
-        <div id="turret-base">
-            <div id="turret-gun"></div>
-        </div>
-    </div>
+    <div id="overlay"><button id="start-btn">ДО БОЮ!</button></div>
+    <div id="ui">Рахунок: <span id="score">0</span> | <span id="mode-text">HIMARS</span></div>
+    <canvas id="game"></canvas>
 
     <script>
-        // --- СТАН ГРИ ---
-        let mode = 'offense';
-        let score = 0;
-        let cityHP = 100;
-        let isRunning = false;
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const modeText = document.getElementById('mode-text');
         
-        // Фізичні списки
-        let enemies = [];
-        let projectiles = [];
-        let particles = [];
+        let score = 0, mode = 'himars', running = false;
+        let objects = [];
 
-        // Управління
-        let pointer = { x: window.innerWidth/2, y: window.innerHeight/2, active: false };
-        let turretAngle = 0; // Поточний кут турелі для плавної анімації
-        let lastShootTime = 0;
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.onresize = resize; resize();
 
-        // Елементи
-        const crosshair = document.getElementById('crosshair');
-        const turretGun = document.getElementById('turret-gun');
-        const scrOff = document.getElementById('screen-offense');
-        const scrDef = document.getElementById('screen-defense');
+        document.getElementById('start-btn').onclick = () => {
+            document.getElementById('overlay').style.display = 'none';
+            running = true;
+            loop();
+        };
 
-        // --- ІНІЦІАЛІЗАЦІЯ ---
-        function startGame() {
-            document.getElementById('story-board').style.display = 'none';
-            document.getElementById('main-ui').style.display = 'flex';
-            setMode('offense');
-            isRunning = true;
-            requestAnimationFrame(gameLoop);
-            setInterval(spawnEnemy, 1200);
-        }
-
-        function setMode(newMode) {
-            mode = newMode;
-            document.querySelectorAll('.tab-btn')[0].classList.toggle('active', mode === 'offense');
-            document.querySelectorAll('.tab-btn')[1].classList.toggle('active', mode === 'defense');
-            scrOff.classList.toggle('active', mode === 'offense');
-            scrDef.classList.toggle('active', mode === 'defense');
-            document.getElementById('hp-stat').style.display = mode === 'defense' ? 'block' : 'none';
+        window.ontouchstart = (e) => {
+            const x = e.touches[0].clientX;
+            const y = e.touches[0].clientY;
             
-            // Очищення сцени при перемиканні
-            enemies.forEach(e => e.el.remove()); enemies = [];
-            projectiles.forEach(p => p.el.remove()); projectiles = [];
-            pointer.active = false;
-            crosshair.style.display = 'none';
-        }
+            if (y < 100 && x < 200) { mode = mode === 'himars' ? 'ppo' : 'himars'; modeText.innerText = mode.toUpperCase(); return; }
 
-        // --- УПРАВЛІННЯ ВВОДОМ ---
-        window.addEventListener('pointerdown', e => { if(!isRunning) return; pointer.active = true; updatePointer(e); });
-        window.addEventListener('pointermove', e => { if(pointer.active) updatePointer(e); });
-        window.addEventListener('pointerup', () => { pointer.active = false; crosshair.style.display = 'none'; });
-        window.addEventListener('pointercancel', () => { pointer.active = false; });
-
-        function updatePointer(e) {
-            pointer.x = e.clientX; pointer.y = e.clientY;
-            if(mode === 'offense') {
-                crosshair.style.display = 'block';
-                crosshair.style.left = pointer.x + 'px';
-                crosshair.style.top = pointer.y + 'px';
+            if (mode === 'himars') {
+                objects.push({ type: 'rocket', x: x, y: 0, targetY: y, active: true });
+            } else {
+                objects.push({ type: 'bullet', x: canvas.width/2, y: canvas.height, tx: x, ty: y, active: true });
             }
-        }
+        };
 
-        // --- СПАВН ВОРОГІВ ---
-        function spawnEnemy() {
-            if(!isRunning) return;
-            const el = document.createElement('div');
-            el.className = 'entity';
-            
-            let enemy = { el: el, active: true, radius: 25 };
+        function loop() {
+            if (!running) return;
+            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            if(mode === 'offense') {
-                // Орки, Танки, Гелікоптери
-                el.classList.add('orc');
-                const types = [
-                    { t: 'mobik', emoji: '🐷🪖', speed: 2.5, y: window.innerHeight - 60 },
-                    { t: 'tank', emoji: '🚜', speed: 1.5, y: window.innerHeight - 70 },
-                    { t: 'heli', emoji: '🚁', speed: 3, y: Math.random() * (window.innerHeight * 0.4) + 50 }
-                ];
-                let type = types[Math.floor(Math.random() * types.length)];
-                el.innerText = type.emoji;
-                
-                let dir = Math.random() > 0.5 ? 1 : -1;
-                enemy.x = dir === 1 ? -50 : window.innerWidth + 50;
-                enemy.y = type.y;
-                enemy.vx = type.speed * dir;
-                enemy.vy = 0; // Для гравітації орків
-                enemy.type = type.t;
-                scrOff.appendChild(el);
-            } 
-            else {
-                // ППО: Шахеди та Ракети
-                const isMissile = Math.random() > 0.7;
-                el.innerText = isMissile ? '🚀' : '🛸';
-                el.style.fontSize = isMissile ? '1.8rem' : '2.5rem';
-                
-                const targetHouseIdx = Math.floor(Math.random() * 5);
-                const houseX = (window.innerWidth / 5) * targetHouseIdx + (window.innerWidth / 10);
-                enemy.x = Math.random() * window.innerWidth;
-                enemy.y = -50;
-                
-                const angle = Math.atan2(window.innerHeight - 80 - enemy.y, houseX - enemy.x);
-                const speed = isMissile ? 4.5 : 2;
-                
-                enemy.vx = Math.cos(angle) * speed;
-                enemy.vy = Math.sin(angle) * speed;
-                enemy.targetIdx = targetHouseIdx;
-                enemy.isMissile = isMissile;
-                enemy.baseAngle = angle;
-                
-                scrDef.appendChild(el);
+            // Спавн ворогів
+            if (Math.random() < 0.03) {
+                objects.push({ type: 'enemy', x: Math.random() * canvas.width, y: -20, active: true });
             }
-            enemies.push(enemy);
-        }
 
-        // --- ФІЗИКА ЧАСТИНОК (Уламки) ---
-        function spawnExplosion(x, y, container, color) {
-            // Трясіння
-            document.body.classList.remove('shake');
-            void document.body.offsetWidth; // trigger reflow
-            document.body.classList.add('shake');
-
-            // Уламки
-            for(let i=0; i<10; i++) {
-                const el = document.createElement('div');
-                el.className = 'particle';
-                el.style.background = color || (Math.random() > 0.5 ? var(--neon-red) : var(--neon-orange));
-                container.appendChild(el);
-                
-                const angle = Math.random() * Math.PI * 2;
-                const speed = Math.random() * 8 + 4;
-                particles.push({
-                    el: el, x: x, y: y,
-                    vx: Math.cos(angle) * speed,
-                    vy: Math.sin(angle) * speed - 5, // Вибух трохи вгору
-                    life: 1, container: container
-                });
-            }
-            
-            // Emoji вибух
-            const exp = document.createElement('div');
-            exp.className = 'entity'; exp.innerText = '💥'; exp.style.fontSize = '3rem';
-            exp.style.transform = `translate(${x-20}px, ${y-20}px)`;
-            container.appendChild(exp);
-            setTimeout(() => exp.remove(), 200);
-        }
-
-        // --- ГОЛОВНИЙ ЦИКЛ ---
-        function gameLoop(time) {
-            if(!isRunning) return;
-
-            // --- 1. СТРІЛЬБА ---
-            if(pointer.active && time - lastShootTime > (mode === 'offense' ? 250 : 80)) {
-                const proj = document.createElement('div');
-                proj.className = 'entity ' + (mode === 'offense' ? 'himars-rocket' : 'tracer');
-                let pData = { el: proj, active: true };
-
-                if(mode === 'offense') {
-                    // HIMARS падає з неба в точку прицілу
-                    pData.x = pointer.x + (Math.random() * 40 - 20); // Трохи розкиду
-                    pData.y = -50;
-                    pData.targetY = pointer.y;
-                    pData.vx = 0;
-                    pData.vy = 15; // Швидке падіння
-                    scrOff.appendChild(proj);
-                } else {
-                    // ППО Стріляє з турелі
-                    const gunX = window.innerWidth / 2;
-                    const gunY = window.innerHeight - 30;
-                    const targetAngle = Math.atan2(pointer.y - gunY, pointer.x - gunX);
+            objects.forEach((obj, i) => {
+                if (obj.type === 'rocket') {
+                    ctx.fillStyle = 'yellow';
+                    ctx.fillRect(obj.x, obj.y += 10, 4, 20);
+                    if (obj.y >= obj.targetY) {
+                        ctx.beginPath(); ctx.arc(obj.x, obj.y, 40, 0, Math.PI*2); ctx.fillStyle = 'red'; ctx.fill();
+                        obj.active = false; score += 10;
+                    }
+                } else if (obj.type === 'bullet') {
+                    ctx.fillStyle = 'lime';
+                    obj.x += (obj.tx - canvas.width/2) / 10;
+                    obj.y += (obj.ty - canvas.height) / 10;
+                    ctx.fillRect(obj.x, obj.y, 4, 10);
+                    if (obj.y < 0) obj.active = false;
+                } else if (obj.type === 'enemy') {
+                    ctx.fillStyle = obj.hit ? 'white' : 'red';
+                    ctx.fillRect(obj.x, obj.y += 2, 30, 30);
                     
-                    pData.x = gunX; pData.y = gunY;
-                    // Розкид зенітки
-                    const spread = (Math.random() - 0.5) * 0.1;
-                    pData.vx = Math.cos(turretAngle + spread) * 22;
-                    pData.vy = Math.sin(turretAngle + spread) * 22;
-                    pData.angle = turretAngle + spread;
-                    scrDef.appendChild(proj);
-                }
-                projectiles.push(pData);
-                lastShootTime = time;
-            }
-
-            // --- ПЛАВНА ТУРЕЛЬ (Lerp) ---
-            if(mode === 'defense') {
-                const gunX = window.innerWidth / 2;
-                const gunY = window.innerHeight - 30;
-                let targetA = -Math.PI / 2; // За замовчуванням вгору
-                if(pointer.active) targetA = Math.atan2(pointer.y - gunY, pointer.x - gunX);
-                
-                turretAngle += (targetA - turretAngle) * 0.15; // Плавний поворот
-                turretGun.style.transform = `translateX(-50%) rotate(${turretAngle + Math.PI/2}rad)`;
-            }
-
-            // --- 2. РУХ СНАРЯДІВ ---
-            for(let i = projectiles.length-1; i >= 0; i--) {
-                let p = projectiles[i];
-                p.x += p.vx; p.y += p.vy;
-
-                if(mode === 'offense') {
-                    p.el.style.transform = `translate(${p.x}px, ${p.y}px)`;
-                    // Вибух HIMARS при досягненні землі/цілі
-                    if(p.y >= p.targetY) {
-                        spawnExplosion(p.x, p.y, scrOff, '#ff8800');
-                        // Радіус ураження (Splash damage)
-                        enemies.forEach(e => {
-                            if(e.active && Math.hypot(e.x - p.x, e.y - p.y) < 60) {
-                                e.active = false; score += 50;
-                                spawnExplosion(e.x, e.y, scrOff, '#ff3333');
-                            }
-                        });
-                        p.active = false;
-                    }
-                } else {
-                    p.el.style.transform = `translate(${p.x}px, ${p.y}px) rotate(${p.angle + Math.PI/2}rad)`;
-                    if(p.y < -50 || p.x < -50 || p.x > window.innerWidth+50) p.active = false;
-                }
-
-                if(!p.active) { p.el.remove(); projectiles.splice(i, 1); }
-            }
-
-            // --- 3. РУХ ВОРОГІВ ---
-            for(let i = enemies.length-1; i >= 0; i--) {
-                let e = enemies[i];
-                if(!e.active) { e.el.remove(); enemies.splice(i, 1); continue; }
-
-                if(mode === 'offense') {
-                    e.x += e.vx;
-                    // Фізика для орків (стрибки)
-                    if(e.type === 'mobik') {
-                        e.vy += 0.4; // Гравітація
-                        e.y += e.vy;
-                        if(e.y > window.innerHeight - 60) { e.y = window.innerHeight - 60; e.vy = -7; } // Відскік
-                    } else if(e.type === 'heli') {
-                        e.y += Math.sin(time * 0.005 + e.x * 0.01) * 2; // Синусоїда польоту
-                    }
-                    e.el.style.transform = `translate(${e.x}px, ${e.y}px) ${e.vx > 0 ? 'scaleX(-1)' : ''}`;
-                    
-                    if(e.x < -100 || e.x > window.innerWidth+100) e.active = false;
-
-                } else {
-                    // ППО Вороги
-                    e.x += e.vx; e.y += e.vy;
-                    // Шахеди трохи виляють
-                    if(!e.isMissile) e.x += Math.sin(time * 0.01) * 1.5;
-
-                    const currentAngle = Math.atan2(e.vy, e.vx);
-                    e.el.style.transform = `translate(${e.x}px, ${e.y}px) rotate(${currentAngle + (e.isMissile ? Math.PI/4 : 0)}rad)`;
-
-                    // Влучання в місто
-                    if(e.y > window.innerHeight - 70) {
-                        spawnExplosion(e.x, e.y, scrDef, '#ff3333');
-                        const houseEl = document.getElementById(`h${e.targetIdx}`);
-                        if(houseEl && !houseEl.classList.contains('ruin')) {
-                            houseEl.classList.add('ruin');
-                            cityHP = Math.max(0, cityHP - 20);
-                            document.getElementById('city-hp').innerText = cityHP + '%';
-                            document.getElementById('city-hp').style.color = cityHP > 40 ? 'var(--neon-green)' : 'var(--neon-red)';
+                    // Перевірка влучань
+                    objects.forEach(p => {
+                        if ((p.type === 'bullet') && Math.hypot(p.x - obj.x, p.y - obj.y) < 40) {
+                            obj.active = false; p.active = false; score += 50;
                         }
-                        e.active = false;
-                    }
-
-                    // Колізія з трасерами ППО (тільки пряме влучання)
-                    for(let j=0; j<projectiles.length; j++) {
-                        let p = projectiles[j];
-                        if(p.active && Math.hypot(e.x - p.x, e.y - p.y) < e.radius) {
-                            spawnExplosion(e.x, e.y, scrDef, '#fff');
-                            e.active = false; p.active = false;
-                            score += e.isMissile ? 100 : 50;
-                            break;
-                        }
-                    }
+                    });
                 }
-            }
+                if (obj.y > canvas.height) obj.active = false;
+            });
 
-            // --- 4. ФІЗИКА ЧАСТИНОК (Гравітація уламків) ---
-            for(let i = particles.length-1; i >= 0; i--) {
-                let pt = particles[i];
-                pt.x += pt.vx;
-                pt.vy += 0.3; // Гравітація уламків
-                pt.y += pt.vy;
-                pt.life -= 0.02; // Затухання
-                
-                pt.el.style.transform = `translate(${pt.x}px, ${pt.y}px) scale(${pt.life})`;
-                pt.el.style.opacity = pt.life;
-
-                if(pt.life <= 0 || pt.y > window.innerHeight) {
-                    pt.el.remove(); particles.splice(i, 1);
-                }
-            }
-
-            document.getElementById('score').innerText = score;
-            requestAnimationFrame(gameLoop);
+            objects = objects.filter(o => o.active);
+            scoreEl.innerText = score;
+            requestAnimationFrame(loop);
         }
     </script>
 </body>
