@@ -186,13 +186,18 @@
 // --- CORE SETUP ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-let width, height, dpr;
+let width, height, dpr, gameZoom;
 
 function resize() {
     width = window.innerWidth; height = window.innerHeight;
     dpr = window.devicePixelRatio || 1;
     canvas.width = width * dpr; canvas.height = height * dpr;
     ctx.scale(dpr, dpr);
+    
+    // Динамическое отдаление камеры для мобилок
+    // Чем меньше экран, тем больше мы "отдаляем" поле
+    gameZoom = Math.max(0.4, Math.min(width, height) / 1000); 
+    if (gameZoom > 1) gameZoom = 1;
 }
 window.addEventListener('resize', resize);
 resize();
@@ -278,19 +283,21 @@ const UPGRADES = [
     { name: "МАРШОВІ ДВИГУНИ", desc: "Швидший рух корабля", apply: () => player.speed += 0.8 },
     { name: "СПЛІТТЕР", desc: "Додатковий снаряд при пострілі", apply: () => player.baseMultishot += 1 },
     { name: "ПРОБИТТЯ", desc: "Снаряди проходять крізь ворогів", apply: () => player.pierce += 1 },
-    { name: "ГРАВІТАЦІЯ", desc: "Сильніший магніт для кристалів", apply: () => player.magnetRadius += 60 },
+    { name: "ГРАВІТАЦІЯ", desc: "Сильніший магніт для кристалів", apply: () => player.magnetRadius += 40 },
     { name: "НАНОБОТИ", desc: "Макс. ХП +20 та повне зцілення", apply: () => { player.maxHp += 20; player.hp = player.maxHp; } }
 ];
 
 class Player {
     constructor() {
         this.x = 0; this.y = 0; this.radius = 12;
-        this.speed = 6; this.color = '#00ffff';
+        this.speed = 8; // Увеличенная скорость для отдаленной камеры
+        this.color = '#00ffff';
         this.maxHp = 100; this.hp = 100;
         this.level = 1; this.exp = 0; this.maxExp = 10;
         
         this.baseDamage = 15; this.fireRate = 15; this.cooldown = 0;
-        this.baseMultishot = 1; this.pierce = 1; this.magnetRadius = 150;
+        this.baseMultishot = 1; this.pierce = 1; 
+        this.magnetRadius = 75; // Уменьшенный радиус ореола сбора
         
         // Buffs
         this.buffs = { shield: 0, overdrive: 0 };
@@ -340,7 +347,8 @@ class Player {
         let nearest = null, minDist = Infinity;
         for (let e of entities.enemies) {
             let d = Math.hypot(this.x - e.x, this.y - e.y);
-            if (d < minDist && d < width) { minDist = d; nearest = e; }
+            // Стреляем только по тем, кто на экране с учетом зума
+            if (d < minDist && d < (Math.max(width, height) / gameZoom)) { minDist = d; nearest = e; }
         }
 
         if (nearest) {
@@ -351,7 +359,7 @@ class Player {
             
             for (let i = 0; i < ms; i++) {
                 const offset = ms === 1 ? 0 : (i - (ms - 1)/2) * spread;
-                const speed = 22;
+                const speed = 28; // Быстрые выстрелы
                 entities.bullets.push(new Bullet(this.x, this.y, Math.cos(angle+offset)*speed, Math.sin(angle+offset)*speed, this.damage, this.pierce, this.buffs.overdrive > 0));
             }
             this.cooldown = this.currentFireRate;
@@ -377,7 +385,9 @@ class Player {
         }
 
         // Draw geometric ship (triangle)
-        ctx.rotate(Math.atan2(camera.y - this.y, camera.x - this.x) + Math.PI/2); // Just slight rotation effect or fixed
+        // Камера теперь всегда следует за игроком плавно
+        const rotAngle = (camera.x !== this.x || camera.y !== this.y) ? Math.atan2(camera.y - this.y, camera.x - this.x) + Math.PI/2 : 0;
+        ctx.rotate(rotAngle); 
         ctx.beginPath();
         ctx.moveTo(0, -this.radius*1.5);
         ctx.lineTo(this.radius, this.radius);
@@ -388,15 +398,15 @@ class Player {
 
         ctx.restore();
 
-        // Magnet Area
+        // Уменьшенный ореол магнита
         ctx.beginPath(); ctx.arc(this.x, this.y, this.magnetRadius, 0, Math.PI*2);
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.05)'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.strokeStyle = 'rgba(0, 255, 255, 0.08)'; ctx.lineWidth = 1; ctx.stroke();
     }
 
     takeDamage(amt) {
         if (this.buffs.shield > 0) return; // Invincible
         this.hp -= amt;
-        screenShake = 12;
+        screenShake = 15;
         updateHUD();
         if (this.hp <= 0) triggerGameOver();
     }
@@ -574,12 +584,15 @@ function spawnEnemies(dt) {
     if (waveTimer >= interval) {
         waveTimer = 0;
         const count = Math.floor(Math.random() * 3) + 3 + Math.floor(gameTime / 20);
-        const dist = Math.hypot(width, height) / 2 + 100;
+        
+        // Враги появляются за границами видимого отдаленного экрана
+        const spawnDist = (Math.max(width, height) / (2 * gameZoom)) + 100; 
         const angle = Math.random() * Math.PI * 2;
-        const bx = player.x + Math.cos(angle) * dist, by = player.y + Math.sin(angle) * dist;
+        const bx = player.x + Math.cos(angle) * spawnDist;
+        const by = player.y + Math.sin(angle) * spawnDist;
 
         const baseHp = 10 + (gameTime * 0.2);
-        const baseSpeed = 2.0 + (gameTime * 0.015);
+        const baseSpeed = 2.5 + (gameTime * 0.015);
 
         for(let i=0; i<count; i++) {
             const ox = (Math.random()-0.5)*100, oy = (Math.random()-0.5)*100;
@@ -635,7 +648,11 @@ function startGame() {
     Audio.init();
     player = new Player();
     entities = { enemies: [], bullets: [], gems: [], powerups: [], particles: [], texts: [] };
-    gameTime = 0; waveTimer = 0; camera = { x: 0, y: 0, targetX: 0, targetY: 0 };
+    gameTime = 0; waveTimer = 0; 
+    
+    // Сброс камеры прямо на игрока
+    camera = { x: player.x, y: player.y, targetX: player.x, targetY: player.y };
+    
     updateHUD(); renderBuffsUI();
     switchState(STATES.PLAYING);
 }
@@ -650,7 +667,6 @@ function triggerLevelUp() {
     const cont = document.getElementById('upgrade-cards');
     cont.innerHTML = '';
     
-    // Pick 3 random
     let shuffled = [...UPGRADES].sort(() => 0.5 - Math.random()).slice(0, 3);
     shuffled.forEach(upg => {
         let c = document.createElement('div'); c.className = 'card';
@@ -671,7 +687,7 @@ function triggerGameOver() {
 // --- MAIN LOOP ---
 function loop(timestamp) {
     requestAnimationFrame(loop);
-    const dt = Math.min((timestamp - lastTime) / 1000, 0.1); // Cap DT to avoid huge jumps
+    const dt = Math.min((timestamp - lastTime) / 1000, 0.1); 
     lastTime = timestamp;
 
     if (currentState === STATES.PLAYING) {
@@ -685,9 +701,9 @@ function loop(timestamp) {
         player.update(dt);
         spawnEnemies(dt);
 
-        // Camera smoothly follows player
-        camera.targetX = player.x - width / 2;
-        camera.targetY = player.y - height / 2;
+        // Smooth Camera following player
+        camera.targetX = player.x;
+        camera.targetY = player.y;
         camera.x += (camera.targetX - camera.x) * 0.1;
         camera.y += (camera.targetY - camera.y) * 0.1;
 
@@ -782,10 +798,13 @@ function draw() {
             ctx.arc(width/2 + Math.cos(t+i)*100, height/2 + Math.sin(t+i*2)*100, 50 + i*20, 0, Math.PI*2);
             ctx.stroke();
         }
-        return; // Don't draw game world
+        return; 
     }
 
     ctx.save();
+    
+    // Move to center of screen
+    ctx.translate(width / 2, height / 2);
     
     // Screenshake
     if (screenShake > 0) {
@@ -793,15 +812,23 @@ function draw() {
         screenShake *= 0.8; if (screenShake < 0.5) screenShake = 0;
     }
     
+    // Apply Mobile Zoom Out
+    ctx.scale(gameZoom, gameZoom);
+    
+    // Center camera on player
     ctx.translate(-camera.x, -camera.y);
 
-    // Dynamic Grid Background
+    // Dynamic Grid Background (увеличенный для отдаленной камеры)
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)'; ctx.lineWidth = 1;
     const gs = 80;
-    const sx = Math.floor(camera.x / gs) * gs, sy = Math.floor(camera.y / gs) * gs;
+    const viewW = width / gameZoom;
+    const viewH = height / gameZoom;
+    const sx = Math.floor((camera.x - viewW/2) / gs) * gs;
+    const sy = Math.floor((camera.y - viewH/2) / gs) * gs;
+    
     ctx.beginPath();
-    for (let x = sx; x < sx + width + gs; x += gs) { ctx.moveTo(x, sy); ctx.lineTo(x, sy + height + gs); }
-    for (let y = sy; y < sy + height + gs; y += gs) { ctx.moveTo(sx, y); ctx.lineTo(sx + width + gs, y); }
+    for (let x = sx; x <= sx + viewW + gs; x += gs) { ctx.moveTo(x, sy); ctx.lineTo(x, sy + viewH + gs); }
+    for (let y = sy; y <= sy + viewH + gs; y += gs) { ctx.moveTo(sx, y); ctx.lineTo(sx + viewW + gs, y); }
     ctx.stroke();
 
     // Entites Rendering Layer
@@ -819,7 +846,7 @@ function draw() {
 
     ctx.restore();
 
-    // Joystick Overlay
+    // Joystick Overlay (рисуется ПОВЕРХ всего и не искажается зумом)
     if (input.active && currentState === STATES.PLAYING) {
         ctx.globalAlpha = 0.15;
         ctx.beginPath(); ctx.arc(input.startX, input.startY, input.maxRadius, 0, Math.PI*2);
@@ -836,7 +863,7 @@ function draw() {
 }
 
 // --- BOOT SEQUENCE ---
-setTimeout(() => { switchState(STATES.MENU); }, 2500); // 2.5s splash screen
+setTimeout(() => { switchState(STATES.MENU); }, 2500); 
 requestAnimationFrame(loop);
 
 </script>
