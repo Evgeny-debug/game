@@ -2,120 +2,392 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Знищувач Свиней: Відплата</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alien Defender</title>
     <style>
-        body { margin: 0; background: #0b0f19; color: #fff; font-family: 'Segoe UI', sans-serif; overflow: hidden; touch-action: none; }
-        canvas { display: block; }
-        #ui { position: fixed; top: 10px; left: 10px; z-index: 10; pointer-events: none; }
-        .hud { font-size: 20px; font-weight: bold; color: #00ff66; text-shadow: 0 0 5px #000; }
-        #menu { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
-        button { padding: 15px 30px; font-size: 20px; border: 2px solid #0057b7; background: transparent; color: white; border-radius: 10px; cursor: pointer; }
-        #victory { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, #0057b7, #000); align-items: center; justify-content: center; font-size: 40px; font-weight: bold; text-align: center; z-index: 200; }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #111;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            user-select: none;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: 4rem;
+            color: #00ffcc;
+            text-shadow: 0 0 20px #00ffcc;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        p {
+            font-size: 1.2rem;
+            color: #ccc;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            background: transparent;
+            color: #00ffcc;
+            border: 2px solid #00ffcc;
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            margin: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            font-weight: bold;
+            border-radius: 5px;
+        }
+
+        .btn:hover {
+            background: #00ffcc;
+            color: #111;
+            box-shadow: 0 0 20px #00ffcc;
+            transform: scale(1.05);
+        }
+
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 5;
+            font-size: 1.5rem;
+            text-shadow: 2px 2px 4px #000;
+            display: none;
+        }
+
+        .score-text { color: #00ffcc; }
+        .lives-text { color: #ff3366; margin-top: 5px;}
+
+        #menu, #game-over { display: flex; }
+        #game-over { display: none; }
     </style>
 </head>
 <body>
 
-<div id="menu">
-    <h1 style="color: #ffd700;">ОБЕРИ РЕЖИМ</h1>
-    <button onclick="startGame('slicer')">🗡️ РІЗАК (Ninja)</button>
-    <button onclick="startGame('shooter')">🔫 КАЛАШ (Тир)</button>
-    <button onclick="startGame('slingshot')">🪃 РОГАТКА</button>
-</div>
+    <div id="hud">
+        <div class="score-text">ОЧКИ: <span id="scoreVal">0</span></div>
+        <div class="lives-text">ЖИТТЯ: <span id="livesVal">3</span></div>
+    </div>
 
-<div id="victory">СЛАВА УКРАЇНІ!<br><small style="font-size: 20px">Героям Слава!</small></div>
+    <!-- Main Menu -->
+    <div id="menu" class="overlay">
+        <h1>Зоряний Захисник</h1>
+        <p>Знищуй прибульців до того, як вони досягнуть бази!</p>
+        <button class="btn" onclick="startGame('easy')">Легко</button>
+        <button class="btn" onclick="startGame('medium')">Нормально</button>
+        <button class="btn" onclick="startGame('hard')">Складно</button>
+    </div>
 
-<div id="ui"><div class="hud">ОЧКИ: <span id="score">0</span></div></div>
+    <!-- Game Over Screen -->
+    <div id="game-over" class="overlay">
+        <h1 style="color: #ff3366; text-shadow: 0 0 20px #ff3366;">ГРУ ЗАКІНЧЕНО</h1>
+        <p style="font-size: 2rem;">Твій рахунок: <span id="finalScore" style="color:#00ffcc; font-weight:bold;">0</span></p>
+        <button class="btn" onclick="showMenu()">В головне меню</button>
+    </div>
 
-<canvas id="game"></canvas>
+    <canvas id="gameCanvas"></canvas>
 
-<script>
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
-const scoreEl = document.getElementById('score');
-let score = 0, gameMode = '', running = false;
-let entities = [], particles = [];
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
 
-// --- ЗВУКОВИЙ РУШІЙ (Синтезатор) ---
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-function playSound(type) {
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.connect(gain); gain.connect(audioCtx.destination);
-    if(type === 'hit') { osc.frequency.value = 400; gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1); }
-    if(type === 'shoot') { osc.frequency.value = 100; gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05); }
-    osc.start(); osc.stop(audioCtx.currentTime + 0.1);
-}
+        // UI Elements
+        const menuOverlay = document.getElementById('menu');
+        const gameOverOverlay = document.getElementById('game-over');
+        const hud = document.getElementById('hud');
+        const scoreEl = document.getElementById('scoreVal');
+        const livesEl = document.getElementById('livesVal');
+        const finalScoreEl = document.getElementById('finalScore');
 
-// --- ІГРОВІ ОБ'ЄКТИ ---
-function spawnPig() {
-    return { x: Math.random() * canvas.width, y: canvas.height + 50, vx: (Math.random()-0.5)*4, vy: -Math.random()*5 - 5, radius: 30, color: '#ffaaaa' };
-}
+        // Game State
+        let isPlaying = false;
+        let score = 0;
+        let lives = 3;
+        let difficultyMultiplier = 1;
+        let enemies = [];
+        let particles = [];
+        let animationId;
+        let spawnTimeout;
 
-function startGame(mode) {
-    gameMode = mode; running = true;
-    document.getElementById('menu').style.display = 'none';
-    requestAnimationFrame(loop);
-}
+        // Audio Context (Synthesizer)
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
 
-// --- УПРАВЛІННЯ ---
-let drag = { active: false, startX: 0, startY: 0 };
-window.addEventListener('pointerdown', (e) => {
-    drag = { active: true, startX: e.clientX, startY: e.clientY };
-    if(gameMode === 'shooter') shoot(e.clientX, e.clientY);
-});
-window.addEventListener('pointerup', (e) => {
-    if(gameMode === 'slingshot' && drag.active) fireSlingshot(e.clientX, e.clientY);
-    drag.active = false;
-});
-
-function shoot(x, y) {
-    playSound('shoot');
-    if(navigator.vibrate) navigator.vibrate(20);
-    entities.forEach((p, i) => {
-        if(Math.hypot(x - p.x, y - p.y) < 50) { 
-            entities.splice(i, 1); score += 10; updateScore(); playSound('hit');
-            if(navigator.vibrate) navigator.vibrate(50);
+        function initAudio() {
+            if (!audioCtx) audioCtx = new AudioContext();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
         }
-    });
-}
 
-function fireSlingshot(x, y) {
-    // Проста логіка векторного запуску
-    let velX = (drag.startX - x) * 0.1;
-    let velY = (drag.startY - y) * 0.1;
-    entities.push({x: drag.startX, y: drag.startY, vx: velX, vy: velY, radius: 15, isProj: true});
-}
+        function playSound(type) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
 
-function updateScore() {
-    scoreEl.innerText = score;
-    if(score >= 500) { document.getElementById('victory').style.display = 'flex'; running = false; }
-}
+            const now = audioCtx.currentTime;
 
-// --- ЦИКЛ ---
-function loop() {
-    if(!running) return;
-    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(0,0, canvas.width, canvas.height);
-    
-    if(Math.random() < 0.02) entities.push(spawnPig());
+            if (type === 'shoot') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(50, now + 0.1);
+                gain.gain.setValueAtTime(0.05, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'hit') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(40, now + 0.2);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'hurt') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.linearRampToValueAtTime(30, now + 0.5);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0.001, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            }
+        }
 
-    entities.forEach((p, i) => {
-        if(!p.isProj) { p.x += p.vx; p.y += p.vy; p.vy += 0.1; } // Гравітація
-        else { p.x += p.vx; p.y += p.vy; p.vy += 0.2; }
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
 
-        ctx.fillStyle = p.color || '#ff8888';
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = '#000'; ctx.fillText('🐷', p.x-10, p.y+5);
+        // Classes
+        class Enemy {
+            constructor(x, y, radius, speed) {
+                this.x = x;
+                this.y = y;
+                this.radius = radius;
+                this.speed = speed;
+                this.color = `hsl(${Math.random() * 60 + 90}, 100%, 50%)`; // Green-ish aliens
+            }
 
-        if(p.y > canvas.height + 100) entities.splice(i, 1);
-    });
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.closePath();
 
-    requestAnimationFrame(loop);
-}
+                // Draw alien eye
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius * 0.4, 0, Math.PI * 2);
+                ctx.fillStyle = '#fff';
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius * 0.2, 0, Math.PI * 2);
+                ctx.fillStyle = '#000';
+                ctx.fill();
+                ctx.closePath();
+            }
 
-resize();
-function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-</script>
+            update() {
+                this.y += this.speed;
+                this.draw();
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.radius = Math.random() * 4 + 1;
+                this.velocity = {
+                    x: (Math.random() - 0.5) * 10,
+                    y: (Math.random() - 0.5) * 10
+                };
+                this.alpha = 1;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.restore();
+            }
+
+            update() {
+                this.x += this.velocity.x;
+                this.y += this.velocity.y;
+                this.alpha -= 0.02;
+                this.draw();
+            }
+        }
+
+        function spawnEnemy() {
+            if (!isPlaying) return;
+            const radius = Math.random() * 15 + 20; // 20 to 35
+            const x = Math.random() * (width - radius * 2) + radius;
+            const speed = (Math.random() * 2 + 1) * difficultyMultiplier;
+            
+            enemies.push(new Enemy(x, -radius, radius, speed));
+            
+            const time = (Math.random() * 1000 + 500) / difficultyMultiplier;
+            spawnTimeout = setTimeout(spawnEnemy, time);
+        }
+
+        // Click to shoot
+        canvas.addEventListener('mousedown', (e) => {
+            if (!isPlaying) return;
+            initAudio();
+            playSound('shoot');
+
+            const mouseX = e.clientX;
+            const mouseY = e.clientY;
+
+            // Muzzle flash effect
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.fillRect(0, 0, width, height);
+
+            // Check collision backwards to hit top-most enemy
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const enemy = enemies[i];
+                const dist = Math.hypot(mouseX - enemy.x, mouseY - enemy.y);
+
+                if (dist - enemy.radius < 0) {
+                    // Hit!
+                    playSound('hit');
+                    score += 10;
+                    scoreEl.innerText = score;
+
+                    // Create Explosion
+                    for (let p = 0; p < 15; p++) {
+                        particles.push(new Particle(enemy.x, enemy.y, enemy.color));
+                    }
+
+                    enemies.splice(i, 1);
+                    break; // Only kill one per click
+                }
+            }
+        });
+
+        function animate() {
+            if (!isPlaying) return;
+            animationId = requestAnimationFrame(animate);
+
+            ctx.fillStyle = 'rgba(17, 17, 17, 0.3)'; // Trail effect
+            ctx.fillRect(0, 0, width, height);
+
+            // Draw ground line
+            ctx.beginPath();
+            ctx.moveTo(0, height - 50);
+            ctx.lineTo(width, height - 50);
+            ctx.strokeStyle = '#ff3366';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Update particles
+            particles.forEach((particle, index) => {
+                if (particle.alpha <= 0) {
+                    particles.splice(index, 1);
+                } else {
+                    particle.update();
+                }
+            });
+
+            // Update enemies
+            enemies.forEach((enemy, index) => {
+                enemy.update();
+
+                // Enemy reached the bottom
+                if (enemy.y + enemy.radius > height - 50) {
+                    enemies.splice(index, 1);
+                    lives--;
+                    livesEl.innerText = lives;
+                    playSound('hurt');
+
+                    // Screen shake
+                    canvas.style.transform = `translate(${(Math.random()-0.5)*10}px, ${(Math.random()-0.5)*10}px)`;
+                    setTimeout(() => canvas.style.transform = 'translate(0,0)', 50);
+
+                    if (lives <= 0) {
+                        endGame();
+                    }
+                }
+            });
+        }
+
+        function startGame(difficulty) {
+            initAudio();
+            menuOverlay.style.display = 'none';
+            gameOverOverlay.style.display = 'none';
+            hud.style.display = 'block';
+
+            if (difficulty === 'easy') difficultyMultiplier = 0.8;
+            else if (difficulty === 'medium') difficultyMultiplier = 1.3;
+            else if (difficulty === 'hard') difficultyMultiplier = 2.0;
+
+            score = 0;
+            lives = 3;
+            enemies = [];
+            particles = [];
+            isPlaying = true;
+            
+            scoreEl.innerText = score;
+            livesEl.innerText = lives;
+
+            ctx.clearRect(0, 0, width, height);
+            spawnEnemy();
+            animate();
+        }
+
+        function endGame() {
+            isPlaying = false;
+            cancelAnimationFrame(animationId);
+            clearTimeout(spawnTimeout);
+            
+            hud.style.display = 'none';
+            gameOverOverlay.style.display = 'flex';
+            finalScoreEl.innerText = score;
+        }
+
+        function showMenu() {
+            gameOverOverlay.style.display = 'none';
+            menuOverlay.style.display = 'flex';
+            ctx.clearRect(0, 0, width, height);
+        }
+    </script>
 </body>
 </html>
