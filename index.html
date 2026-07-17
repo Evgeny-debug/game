@@ -3,91 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Свинська Навала</title>
+    <title>Знищувач Свиней: Відплата</title>
     <style>
-        body { margin: 0; padding: 0; background: #0b0f19; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; }
+        body { margin: 0; background: #0b0f19; color: #fff; font-family: 'Segoe UI', sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
-        #ui { position: absolute; top: 20px; left: 20px; z-index: 10; pointer-events: none; }
-        .score { font-size: 24px; font-weight: bold; color: #ffd700; text-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        #ui { position: fixed; top: 10px; left: 10px; z-index: 10; pointer-events: none; }
+        .hud { font-size: 20px; font-weight: bold; color: #00ff66; text-shadow: 0 0 5px #000; }
+        #menu { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
+        button { padding: 15px 30px; font-size: 20px; border: 2px solid #0057b7; background: transparent; color: white; border-radius: 10px; cursor: pointer; }
+        #victory { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, #0057b7, #000); align-items: center; justify-content: center; font-size: 40px; font-weight: bold; text-align: center; z-index: 200; }
     </style>
 </head>
 <body>
-    <div id="ui">
-        <div class="score">Рахунок: <span id="val">0</span></div>
-    </div>
-    <canvas id="game"></canvas>
+
+<div id="menu">
+    <h1 style="color: #ffd700;">ОБЕРИ РЕЖИМ</h1>
+    <button onclick="startGame('slicer')">🗡️ РІЗАК (Ninja)</button>
+    <button onclick="startGame('shooter')">🔫 КАЛАШ (Тир)</button>
+    <button onclick="startGame('slingshot')">🪃 РОГАТКА</button>
+</div>
+
+<div id="victory">СЛАВА УКРАЇНІ!<br><small style="font-size: 20px">Героям Слава!</small></div>
+
+<div id="ui"><div class="hud">ОЧКИ: <span id="score">0</span></div></div>
+
+<canvas id="game"></canvas>
 
 <script>
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
-    const scoreVal = document.getElementById('val');
-    let score = 0, speedMult = 1;
-    let pigs = [], particles = [];
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+let score = 0, gameMode = '', running = false;
+let entities = [], particles = [];
 
-    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-    window.onresize = resize; resize();
+// --- ЗВУКОВИЙ РУШІЙ (Синтезатор) ---
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playSound(type) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    if(type === 'hit') { osc.frequency.value = 400; gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1); }
+    if(type === 'shoot') { osc.frequency.value = 100; gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05); }
+    osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+}
 
-    class Pig {
-        constructor() {
-            this.x = Math.random() * (canvas.width - 50) + 25;
-            this.y = -50;
-            this.size = 40 + Math.random() * 20;
-            this.speed = (1 + Math.random() * 2) * speedMult;
+// --- ІГРОВІ ОБ'ЄКТИ ---
+function spawnPig() {
+    return { x: Math.random() * canvas.width, y: canvas.height + 50, vx: (Math.random()-0.5)*4, vy: -Math.random()*5 - 5, radius: 30, color: '#ffaaaa' };
+}
+
+function startGame(mode) {
+    gameMode = mode; running = true;
+    document.getElementById('menu').style.display = 'none';
+    requestAnimationFrame(loop);
+}
+
+// --- УПРАВЛІННЯ ---
+let drag = { active: false, startX: 0, startY: 0 };
+window.addEventListener('pointerdown', (e) => {
+    drag = { active: true, startX: e.clientX, startY: e.clientY };
+    if(gameMode === 'shooter') shoot(e.clientX, e.clientY);
+});
+window.addEventListener('pointerup', (e) => {
+    if(gameMode === 'slingshot' && drag.active) fireSlingshot(e.clientX, e.clientY);
+    drag.active = false;
+});
+
+function shoot(x, y) {
+    playSound('shoot');
+    if(navigator.vibrate) navigator.vibrate(20);
+    entities.forEach((p, i) => {
+        if(Math.hypot(x - p.x, y - p.y) < 50) { 
+            entities.splice(i, 1); score += 10; updateScore(); playSound('hit');
+            if(navigator.vibrate) navigator.vibrate(50);
         }
-        update() { this.y += this.speed; }
-        draw() {
-            ctx.font = `${this.size}px Arial`;
-            ctx.fillText('🐷', this.x, this.y);
-        }
-    }
+    });
+}
 
-    class Particle {
-        constructor(x, y) {
-            this.x = x; this.y = y;
-            this.vx = (Math.random() - 0.5) * 10;
-            this.vy = (Math.random() - 0.5) * 10;
-            this.life = 1.0;
-        }
-        update() { this.x += this.vx; this.y += this.vy; this.life -= 0.02; }
-        draw() {
-            ctx.fillStyle = `rgba(255, 100, 100, ${this.life})`;
-            ctx.fillRect(this.x, this.y, 6, 6);
-        }
-    }
+function fireSlingshot(x, y) {
+    // Проста логіка векторного запуску
+    let velX = (drag.startX - x) * 0.1;
+    let velY = (drag.startY - y) * 0.1;
+    entities.push({x: drag.startX, y: drag.startY, vx: velX, vy: velY, radius: 15, isProj: true});
+}
 
-    function spawnPig() { if(Math.random() < 0.05) pigs.push(new Pig()); }
+function updateScore() {
+    scoreEl.innerText = score;
+    if(score >= 500) { document.getElementById('victory').style.display = 'flex'; running = false; }
+}
 
-    window.addEventListener('pointerdown', (e) => {
-        pigs.forEach((p, i) => {
-            if (Math.hypot(e.clientX - (p.x + p.size/2), e.clientY - (p.y + p.size/2)) < p.size) {
-                for(let j=0; j<10; j++) particles.push(new Particle(p.x, p.y));
-                pigs.splice(i, 1);
-                score++;
-                scoreVal.innerText = score;
-                speedMult += 0.05; // Збільшуємо складність
-            }
-        });
+// --- ЦИКЛ ---
+function loop() {
+    if(!running) return;
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(0,0, canvas.width, canvas.height);
+    
+    if(Math.random() < 0.02) entities.push(spawnPig());
+
+    entities.forEach((p, i) => {
+        if(!p.isProj) { p.x += p.vx; p.y += p.vy; p.vy += 0.1; } // Гравітація
+        else { p.x += p.vx; p.y += p.vy; p.vy += 0.2; }
+
+        ctx.fillStyle = p.color || '#ff8888';
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#000'; ctx.fillText('🐷', p.x-10, p.y+5);
+
+        if(p.y > canvas.height + 100) entities.splice(i, 1);
     });
 
-    function loop() {
-        ctx.fillStyle = 'rgba(11, 15, 25, 0.3)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        spawnPig();
-        
-        pigs.forEach((p, i) => {
-            p.update(); p.draw();
-            if (p.y > canvas.height) pigs.splice(i, 1);
-        });
+    requestAnimationFrame(loop);
+}
 
-        particles.forEach((p, i) => {
-            p.update(); p.draw();
-            if (p.life <= 0) particles.splice(i, 1);
-        });
-
-        requestAnimationFrame(loop);
-    }
-    loop();
+resize();
+function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
 </script>
 </body>
 </html>
